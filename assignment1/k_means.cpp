@@ -12,11 +12,45 @@ using namespace std;
 
 const int k = 75;
 
-double cosine_similarity(vector<double> center, vector<double> v) {
+struct Cluster {
+    vector<double> center;
+    vector<pair<string, vector<double> > > vectors;
+    vector<double> sum;
+
+    Cluster(string word, vector<double> &v) {
+        pair<string, vector<double> > p(word, v);
+        this->insert(p);
+    }
+
+    void insert(pair<string, vector<double> > v) {
+        vectors.push_back(v);
+        this->update_center(v.second);
+    }
+
+    void update_center(vector<double> v) {
+        if(vectors.size() == 1) {
+            center = v;
+            sum = center;
+        }
+        else {
+            vector<double> result;
+            transform(sum.begin(), sum.end(), v.begin(), back_inserter(result), plus<double>());
+            sum = result;
+            vector<double> mean;
+            int size = vectors.size();
+            transform(sum.begin(), sum.end(), mean.begin(), bind(divides<double>(), placeholders::_1, size));
+            center = mean;
+        }
+    }
+};
+
+double cosine_similarity(vector<double> &center, vector<double> &v) {
     double dotProduct = inner_product(begin(center), end(center), begin(v), 0.0);
     double normCenter = sqrt(inner_product(begin(center), end(center), begin(center), 0.0 ));
     double normV = sqrt(inner_product(begin(v), end(v), begin(v), 0.0 ));
     double cosineSim = dotProduct/(normCenter * normV);
+    if(cosineSim < -1 || cosineSim > 1)
+        throw invalid_argument("cosine sim out of range");
     return cosineSim;
 }
 
@@ -45,9 +79,18 @@ const map<string, vector<double> > read_file() {
     return wordVectors;
 }
 
-const vector<vector<double> > get_centers(map<string, vector<double> > wordVecs) {
-    vector<vector<double> > centers;
+const vector<Cluster> init_clusters(map<string, vector<double> > &wordVecs) {
+    vector<Cluster> centers;
     vector<int> generatedInts;
+    int size = wordVecs.size();
+    int interval = size/k;
+    map<string, vector<double> >::iterator iter = wordVecs.begin();
+    for(int i = 0; i*interval < size; i++){
+        advance(iter, i*interval);
+        Cluster c(iter->first, iter->second);
+        centers.push_back(c);
+    }
+    /*
     auto item = wordVecs.begin();
     int i = 0;
     while(i < k-1) {
@@ -58,11 +101,29 @@ const vector<vector<double> > get_centers(map<string, vector<double> > wordVecs)
             advance(item, randNum);
         }
     }
+    */
     return centers;
 }
 
-int main(int argc, char** argv) {
-    read_file();
+void create_clusters(map<string, vector<double> > wordVecs) {
+    vector<Cluster> centers = init_clusters(wordVecs);
+    map<string, vector<double> >::iterator it;
+    for(it = wordVecs.begin(); it != wordVecs.end(); it++){
+        vector<double> currentVec = it->second;
+        double maxSim = -2; // cosine similarity is [-1, 1]
+        vector<double> simCenter;
+        for(vector<double> center: centers) {
+            double sim = cosine_similarity(center, currentVec);
+            if(sim > maxSim) {
+                maxSim = sim;
+                simCenter = center;
+            }
+        }
+    }
+}
 
+int main(int argc, char** argv) {
+    auto wordVecs = read_file();
+    create_clusters(wordVecs);
     return 0;
 }
