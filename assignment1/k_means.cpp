@@ -26,44 +26,47 @@ double cosine_similarity(vector<double> &center, vector<double> &v) {
 
 const set<CmPtr, CmComp> read_file(char* fileName, int dims) {
     set<CmPtr, CmComp> clusterMembers;
-    string word;
+    ifstream infile(fileName);
+    string line;
+    int i = 0;
+    while(getline(infile, line)) {
+        stringstream ss(line);
+        string item;
+        int splitNum = 0;
+        string currentWord;
+        vector<double> v;
+        while(getline(ss, item, ' ')) {
+            if (splitNum == 0) {                
+                splitNum++;
+                currentWord = item;
+                continue;
+            }
+            double val = stod(item);
+            v.push_back(val);
+        }
+        CmPtr cmptr = make_shared<ClusterMember>(currentWord, v, i++);
+        clusterMembers.insert(cmptr);
+    }
+    return clusterMembers;
+    /*
+    char chars[50];
     double vec[dims];
     
     FILE *fp;
     fp = fopen(fileName, "r");
     int i = 0;
     while(true) {
-        int r = fscanf(fp, "%s %d\n", &word, vec);
+        int r = fscanf(fp, "%s %.6f", chars, vec);
         if( r == EOF ) 
            break;
         vector<double> v;
         v.assign(vec, vec + dims);
+        string word(chars);
         CmPtr cmptr = make_shared<ClusterMember>(word, v, i++);
         clusterMembers.insert(cmptr);
     }
     fclose(fp);
-    /*
-    ifstream infile("/Users/liamadams/Documents/school/cs512/assignment1/YELP_auto_phrase.emb");
-    while(getline(infile, line)) {
-        stringstream ss(line);
-        string item;
-        int splitNum = 0;
-        string currentWord;
-        ClusterMember cm;
-        while(getline(ss, item, ' ')) {
-            if (splitNum == 0) {
-                vector<double> v;
-                cm(item, v);
-                splitNum++;
-                currentWord = item;
-            }
-            double val = stod(item);
-            set<ClusterMember>::iterator iter = clusterMembers.find
-            wordVectors[currentWord].push_back(val);
-        }
-    }
     */
-    return clusterMembers;
 }
 
 const set<ClusterPtr, ClusterComp> init_clusters(set<CmPtr, CmComp> members) {

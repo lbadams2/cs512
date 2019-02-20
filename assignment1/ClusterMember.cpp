@@ -35,11 +35,11 @@ bool ClusterMember::operator< (const ClusterMember &right) const {
     return memId < right.getId();
 }
 
-bool CmComp::operator() (const CmPtr& l, const CmPtr& r) {
+bool CmComp::operator() (const CmPtr& l, const CmPtr& r) const {
     return *l < *r;
 }
 
 ostream& operator<<(ostream& os, const ClusterMember& obj) {
-            os << obj.getWord() << "\n";
-            return os;
+    os << obj.getWord() << "\n";
+    return os;
 }

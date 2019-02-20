@@ -47,11 +47,12 @@ void Cluster::update_center(const vector<double> &v) {
     center = mean;
 }
 
-bool ClusterComp::operator() (const ClusterPtr& l, const ClusterPtr& r) {
+bool ClusterComp::operator() (const ClusterPtr& l, const ClusterPtr& r) const {
     return *l < *r;
 }
 
 ostream& operator<<(ostream& os, const Cluster& obj) {
-            for(const CmPtr& cm: obj.getMembers())
-                cout << *cm;
+    for(const CmPtr& cm: obj.getMembers())
+        os << *cm;
+    return os;
 }

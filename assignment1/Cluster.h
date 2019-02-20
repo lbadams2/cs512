@@ -9,7 +9,7 @@ class ClusterMember;
 typedef std::shared_ptr<ClusterMember> CmPtr;
 
 struct CmComp{
-    bool operator() (const CmPtr& l, const CmPtr& r);
+    bool operator() (const CmPtr& l, const CmPtr& r) const;
 };
 
 class Cluster {
@@ -33,7 +33,7 @@ class Cluster {
 
 typedef std::shared_ptr<Cluster> ClusterPtr;
 struct ClusterComp{
-    bool operator() (const ClusterPtr& l, const ClusterPtr& r);
+    bool operator() (const ClusterPtr& l, const ClusterPtr& r) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const Cluster& obj);
