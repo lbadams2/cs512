@@ -2,100 +2,17 @@
 #include <fstream>
 #include <numeric>
 #include <vector>
-#include <map>
 #include <string>
 #include <sstream>
 #include <cmath>
 #include <stdexcept>
 #include <iterator>
 #include <set>
+#include "Cluster.h"
+#include "ClusterMember.h"
 using namespace std;
 
 const int k = 75;
-
-class ClusterMember {
-    public:
-        ClusterMember(string word, vector<double> &vec) : word(word), vec(vec), clusterSim(-2)
-        {
-        }
-
-        const vector<double>& getVector() const {
-            return vec;
-        }
-
-        bool operator< (const ClusterMember &right) const {
-            return word < right.word;
-        }
-
-        const string getWord() const {
-            return word;
-        }
-
-        double getClusterSim() const {
-            return clusterSim;
-        }
-
-        void setCluster(Cluster &theCluster) {
-            cluster = theCluster;
-        }
-
-    private:
-        double clusterSim;
-        const string word;
-        const vector<double>& vec;
-        shared_ptr<Cluster> cluster;
-};
-
-class Cluster {
-    public:
-        Cluster(){}
-
-        Cluster(ClusterMember &cm, int id) {
-            clusterId = id;
-            center = cm.getVector();
-            sum = center;
-            insert(cm);
-        }
-
-        void insert(ClusterMember &member) {
-            members.insert(member);
-            this->update_center(member.getVector());
-        }
-
-        vector<double> getCenter() const {
-            return this->center;
-        }
-
-        void removeMember(ClusterMember &member) {
-            set<ClusterMember>::iterator iter = members.find(member);
-            if(iter != members.end())
-                members.erase(iter);
-        }
-
-        int getId() const {
-            return clusterId;
-        }
-
-        bool operator< (const Cluster &right) const {
-            return clusterId < right.getId();
-        }
-
-    private:
-        int clusterId;
-        vector<double> center;
-        vector<double> sum;
-        set<ClusterMember> members;
-
-        void update_center(vector<double> &v) {
-            vector<double> result;
-            transform(sum.begin(), sum.end(), v.begin(), back_inserter(result), plus<double>());
-            sum = result;
-            vector<double> mean;
-            int size = members.size();
-            transform(sum.begin(), sum.end(), mean.begin(), bind(divides<double>(), placeholders::_1, size));
-            center = mean;
-        }
-};
 
 double cosine_similarity(vector<double> &center, vector<double> &v) {
     double dotProduct = inner_product(begin(center), end(center), begin(v), 0.0);
@@ -107,21 +24,22 @@ double cosine_similarity(vector<double> &center, vector<double> &v) {
     return cosineSim;
 }
 
-const set<ClusterMember> read_file(char* fileName, int dims) {
-    set<ClusterMember> clusterMembers;
+const set<CmPtr, CmComp> read_file(char* fileName, int dims) {
+    set<CmPtr, CmComp> clusterMembers;
     string word;
     double vec[dims];
     
     FILE *fp;
     fp = fopen(fileName, "r");
+    int i = 0;
     while(true) {
         int r = fscanf(fp, "%s %d\n", &word, vec);
         if( r == EOF ) 
            break;
         vector<double> v;
         v.assign(vec, vec + dims);
-        ClusterMember cm(word, v);
-        clusterMembers.insert(cm);
+        CmPtr cmptr = make_shared<ClusterMember>(word, v, i++);
+        clusterMembers.insert(cmptr);
     }
     fclose(fp);
     /*
@@ -148,59 +66,56 @@ const set<ClusterMember> read_file(char* fileName, int dims) {
     return clusterMembers;
 }
 
-const set<Cluster> init_clusters(set<ClusterMember> members) {
-    set<Cluster> centers;
+const set<ClusterPtr, ClusterComp> init_clusters(set<CmPtr, CmComp> members) {
+    set<ClusterPtr, ClusterComp> centers;
     vector<int> generatedInts;
     int size = members.size();
     int interval = size/k;
-    set<ClusterMember>::iterator iter = members.begin();
+    set<CmPtr, CmComp>::iterator iter = members.begin();
     for(int i = 0; i*interval < size; i++){
         advance(iter, interval);
-        ClusterMember test = *iter;
-        Cluster c(test, i);
-        centers.insert(c);
+        ClusterPtr cptr = make_shared<Cluster>(*iter, i);
+        centers.insert(cptr);
     }
-    /*
-    auto item = wordVecs.begin();
-    int i = 0;
-    while(i < k-1) {
-        int randNum = random_0_to_n(wordVecs.size());
-        if(find(generatedInts.begin(), generatedInts.end(), randNum) == generatedInts.end()) {
-            generatedInts.push_back(randNum);
-            i++;
-            advance(item, randNum);
-        }
-    }
-    */
     return centers;
 }
 
-void create_clusters(set<ClusterMember> members) {
-    set<Cluster> centers = init_clusters(members);
-    set<ClusterMember>::iterator it;
-    bool clusterChange = false;
-    for(it = members.begin(); it != members.end(); it++){
-        vector<double> currentVec = it->getVector();
-        double maxSim = it->getClusterSim(); // cosine similarity is [-1, 1]
-        Cluster simCluster;
-        for(Cluster &center: centers) {
-            vector<double> vecCenter = center.getCenter();
-            double sim = cosine_similarity(vecCenter, currentVec);
-            if(sim > maxSim) {
-                maxSim = sim;
-                simCluster = center;
+set<ClusterPtr, ClusterComp> create_clusters(set<CmPtr, CmComp> members) {
+    set<ClusterPtr, ClusterComp> centers = init_clusters(members);
+    set<CmPtr, CmComp>::iterator it;
+    while(true) {
+        bool clusterChange = false;
+        for(it = members.begin(); it != members.end(); it++){
+            vector<double> currentVec = (*it)->getVector();
+            double maxSim = (*it)->getClusterSim(); // cosine similarity is [-1, 1]
+            ClusterPtr simCluster;
+            for(ClusterPtr center: centers) {
+                vector<double> vecCenter = center->getCenter();
+                double sim = cosine_similarity(vecCenter, currentVec);
+                if(sim > maxSim) {
+                    maxSim = sim;
+                    simCluster = center;
+                }
+            }
+            // assign to new cluster
+            if(maxSim != (*it)->getClusterSim()) {
+                clusterChange = true;
+                ClusterPtr oldCluster = (*it)->getCluster();
+                oldCluster->removeMember(*it);
+                (*it)->setCluster(simCluster);
+                simCluster->insert(*it);
             }
         }
-        // assign to new cluster
-        if(maxSim != it->getClusterSim()) {
-            clusterChange = true;
-
-        }
+        if(!clusterChange)
+            break;
     }
+    return centers;
 }
 
 int main(int argc, char** argv) {    
-    set<ClusterMember> members = read_file(argv[1], 100);
-    create_clusters(members);
+    set<CmPtr, CmComp> members = read_file(argv[1], 100);
+    set<ClusterPtr, ClusterComp> clusters = create_clusters(members);
+    for(ClusterPtr c: clusters)
+        cout << c << "\n\n";
     return 0;
 }
