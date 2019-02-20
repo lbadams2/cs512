@@ -10,7 +10,7 @@ typedef std::shared_ptr<Cluster> ClusterPtr;
 
 class ClusterMember{
     public:
-        ClusterMember(std::string word, std::vector<double> &vec, int id);
+        ClusterMember(std::string word, std::vector<double> vec, int id);
         const std::vector<double>& getVector() const;
         const std::string getWord() const;
         double getClusterSim() const;
@@ -23,7 +23,7 @@ class ClusterMember{
         const int memId;
         double clusterSim;
         const std::string word;
-        const std::vector<double>& vec;
+        const std::vector<double> vec;
         ClusterPtr cluster;
 };
 

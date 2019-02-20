@@ -2,7 +2,7 @@
 #include "Cluster.h"
 using namespace std;
 
-ClusterMember::ClusterMember(string word, vector<double> &vec, int id) : word(word), vec(vec), memId(id), 
+ClusterMember::ClusterMember(string word, vector<double> vec, int id) : word(word), vec(move(vec)), memId(id), 
                                                             clusterSim(-2), cluster(make_shared<Cluster>(Cluster()))
 {
 }

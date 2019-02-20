@@ -12,7 +12,7 @@
 #include "ClusterMember.h"
 using namespace std;
 
-const int k = 75;
+const int k = 5;
 
 double cosine_similarity(vector<double> &center, vector<double> &v) {
     double dotProduct = inner_product(begin(center), end(center), begin(v), 0.0);
@@ -75,9 +75,11 @@ const set<ClusterPtr, ClusterComp> init_clusters(set<CmPtr, CmComp> members) {
     int size = members.size();
     int interval = size/k;
     set<CmPtr, CmComp>::iterator iter = members.begin();
+    ClusterPtr cptr = make_shared<Cluster>(*iter, 0);
+    centers.insert(cptr);
     for(int i = 0; i*interval < size; i++){
         advance(iter, interval);
-        ClusterPtr cptr = make_shared<Cluster>(*iter, i);
+        cptr = make_shared<Cluster>(*iter, i*interval);
         centers.insert(cptr);
     }
     return centers;
