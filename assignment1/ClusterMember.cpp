@@ -2,8 +2,8 @@
 #include "Cluster.h"
 using namespace std;
 
-ClusterMember::ClusterMember(string word, vector<double> vec, int id) : word(word), vec(move(vec)), memId(id), 
-                                                            clusterSim(-2), cluster(make_shared<Cluster>(Cluster()))
+ClusterMember::ClusterMember(string word, vector<double> vec, int id) : word(word), vec(move(vec)), memId(id),
+clusterSim(-2), cluster(make_shared<Cluster>(Cluster()))
 {
 }
 
@@ -15,8 +15,12 @@ const string ClusterMember::getWord() const {
     return word;
 }
 
-double ClusterMember::getClusterSim() const {
+const double ClusterMember::getClusterSim() const {
     return clusterSim;
+}
+
+void ClusterMember::setClusterSim(double sim) {
+    this->clusterSim = sim;
 }
 
 void ClusterMember::setCluster(ClusterPtr theCluster) {
