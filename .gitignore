@@ -3,3 +3,4 @@
 *.out
 *.emb
 data/
+*.txt
