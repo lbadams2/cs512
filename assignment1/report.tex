@@ -824,7 +824,7 @@ any combination of & 0.0049302285\\
 }
 \end{table}\\
 \section*{Phrasal Segmentation Metrics}
-The below table shows the number of unique qualified phrases and average number of phrases per sentence for each dataset for $HIGHLIGHT\_SINGLE=.9$ and $HIGHLIGHT\_MULTI=.5$.  These metrics include both single and multi word phrases.
+The below table shows the number of unique qualified phrases and average number of phrases per sentence for each dataset for $HIGHLIGHT\_SINGLE=.9$ and $HIGHLIGHT\_MULTI=.5$.  I extracted unique phrases from segmentation.txt after running phrasal\_segmentation.sh.  These metrics include both single and multi word phrases.
 \begin{table}[ht]
     \centering
     \begin{tabular}{|c|c|c|}
@@ -1426,7 +1426,7 @@ On this and the following page I've used the same process as described for NYT o
     }
 \end{table}\\
 \section*{AutoPhrase Parameters}
-The images below show plots of the number of unique phrases returned by AutoPhrase with different highlight thresholds.  The top figure shows the number of unique single word phrases and the bottom figure shows the number of unique multi word phrases.\\
+The images below show plots of the number of unique phrases returned by AutoPhrase with different highlight thresholds.  The top figure shows the number of unique single word phrases and the bottom figure shows the number of unique multi word phrases.  I extracted unique phrases from segmentation.txt after running phrasal\_segmentation.sh.\\
 There is a very clear inverse relationship between highlight threshold and number of unique phrases.  The shapes of the graphs are very similar for both datasets with the NYT dataset yielding more phrases for both single and multi word, except with a very low threshold in the multi word curve.  In the single word curve they both plateau for a while before dropping for a threshold in the .5-.6 range.  In the multi word curve they both drop very steeply as the threshold rises from 0 to .2 before leveling off a bit.\\
 This shows that AutoPhrase detects more phrases in the NYT dataset, presumably because it is written with correct grammar and less slang than Yelp.
 \begin{figure}[ht]
