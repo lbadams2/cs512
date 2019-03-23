@@ -1,12 +1,16 @@
 from util import Json
 from const import DIR_DATASET
+from itertools import count
 
 
 class Candidate:
+    _count = count(0)
+
     def __init__(self, cid, prob, name):
         self.id = cid
         self.prob = prob
         self.name = name
+        next(self._count)
 
 
 class Mention:
