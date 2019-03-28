@@ -102,10 +102,49 @@ class EmbedModel:
         self.logreg.fit(feature_matrix, target_matrix.ravel())
 
     def predict(self, dataset):
+        print('Begin predicting')
         pred_cids = []
         for mention in dataset.mentions:
-            pred_cids.append(max(mention.candidates, key=attrgetter('prob')).id if mention.candidates else 'NIL')
+            if mention.candidates:
+                print('Predicting ' + mention.surface)
+                feature_matrix = self.get_test_matrix(mention)
+                print('Got feature matrix, calling logreg predict')
+                conf_probs = self.logreg.predict_proba(feature_matrix)[:,1]
+                print('logreg predict done')
+                index_max = max(range(len(conf_probs)), key=conf_probs.__getitem__)
+                pred_cids.append(mention.candidates[index_max].id)
+            else:
+                pred_cids.append('NIL')
         return pred_cids
+
+    def get_test_matrix(self, mention):
+        surface_name = mention.surface
+        current_candidate = 0
+        candidate_count = len(mention.candidates)
+        feature_matrix = np.empty(shape=(candidate_count, 603))
+        with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
+            ent2embed = pickle.load(ent_embed_file)
+            with open("../data/embeddings/word2embed.pk", "rb") as word_embed_file:
+                word2embed = pickle.load(word_embed_file)
+                for candidate in mention.candidates:
+                    sim = SequenceMatcher(None, candidate.name, surface_name).ratio()
+                    prob = candidate.prob
+                    candidate_name = candidate.name.replace(' ', '_')
+                    cand_embed = np.array(ent2embed[candidate_name])
+                    context_embed_sum = np.zeros(shape=300)
+                    total_context = mention.contexts[0] + mention.contexts[1]
+                    for word in total_context:
+                        if word not in word2embed:
+                            continue
+                        word_embed = np.array(word2embed[word])
+                        context_embed_sum = context_embed_sum + word_embed
+                    cos_sim = np.dot(cand_embed, context_embed_sum)/norm(cand_embed)*norm(context_embed_sum)
+                    hc_feature_array = np.array([sim, prob, cos_sim])
+                    row = np.concatenate([cand_embed, context_embed_sum, hc_feature_array])
+                    feature_matrix[current_candidate] = row
+                    current_candidate = current_candidate + 1
+
+        return feature_matrix
 
     def get_training_dataframe(self, dataset, candidate_count):
         #text_sim = []
