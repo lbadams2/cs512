@@ -206,11 +206,16 @@ class GRU(nn.Module):
     def initHidden(self, N):
         return Variable(torch.randn(1, N, self.HIDDEN_SIZE))
 
+
 class CandidateDataset(Dataset):
     def __init__(self, x, y):
         self.len = x.shape[0]
-        self.x_data = torch.from_mumpy(x)
-        self.y_data = torch.from_mumpy(y)
+        if torch.cuda.is_available():
+            device = 'cuda'
+        else:
+            device = 'cpu'
+        self.x_data = torch.as_tensor(x, device=device, dtype=torch.float)
+        self.y_data = torch.as_tensor(y, device=device)
     
     def __getitem__(self, index):
         return self.x_data[index], self.y_data[index]
@@ -221,7 +226,7 @@ class CandidateDataset(Dataset):
 
 class NeuralModel():
 
-    N_EPOCHS = 40
+    N_EPOCHS = 5
     BATCH_SIZE = 50
     
     def __init__(self, model):
@@ -230,48 +235,51 @@ class NeuralModel():
         self.loss_f = nn.CrossEntropyLoss()
 
     def fit(self, dataset, candidate_count):
-        feature_tensor, target_tensor = self.get_training_tensors_test(candidate_count)
-        x_train = Variable(feature_tensor)
-        y_train = Variable(target_tensor)
+        #candidate_ds = self.get_test_ds(candidate_count)
+        candidate_ds = self.get_cand_ds(dataset, candidate_count)
+        train_loader = DataLoader(dataset = candidate_ds, batch_size = self.BATCH_SIZE, shuffle = True)
         for epoch in range(self.N_EPOCHS):
             print('starting epoch ' + str(epoch))
-            permutation = torch.randperm(x_train.size()[0])
-            for i in range(0, x_train.size()[0], self.BATCH_SIZE):
-                print('starting batch ' + str(i) + ' epoch ' + str(epoch))
+            for batch_idx, (inputs, labels) in enumerate(train_loader):
+                print('starting batch ' + str(batch_idx) + ' epoch ' + str(epoch))
+                inputs, labels = Variable(inputs), Variable(labels)
                 self.optimizer.zero_grad()
-                indices = permutation[i:i+self.BATCH_SIZE]
-                batch_x, batch_y = x_train[indices], y_train[indices]
-                batch_x = batch_x.view(1, self.BATCH_SIZE, 600)
-                y_pred = self.model(batch_x, self.model.initHidden(batch_x.size()[1]))
-                loss = self.loss_f(y_pred, torch.max(batch_y, 1)[1])
+                inputs = inputs.view(1, inputs.size()[0], 600)
+                y_pred = self.model(inputs, self.model.initHidden(inputs.size()[1]))
+                loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
                 loss.backward()
                 self.optimizer.step()
-                print('done batch ' + str(i) + ' epoch ' + str(epoch))
+                print('done batch ' + str(batch_idx) + ' epoch ' + str(epoch))
             print('done epoch ' + str(epoch))
 
     def predict(self, dataset):
         pass
 
-    def get_training_tensors_test(self, candidate_count):
+    def get_test_ds(self, candidate_count):
         feature_matrix = np.random.rand(candidate_count, 600)
         target_matrix = np.random.rand(candidate_count, 2)
-        feature_tensor = torch.as_tensor(feature_matrix, device=self.model.device, dtype=torch.float)
-        target_tensor = torch.as_tensor(target_matrix, device=self.model.device, dtype=torch.long)
-        return feature_tensor, target_tensor
+        candidate_ds = CandidateDataset(feature_matrix, target_matrix)
+        return candidate_ds
 
-    def get_training_tensors(self, dataset, candidate_count):
+    # assignment2/Assignment2_EL
+    def get_cand_ds(self, dataset, candidate_count):
         feature_matrix = np.empty(shape=(candidate_count, 600))
-        target_matrix = np.empty(shape=(candidate_count, 1))
+        target_matrix = np.empty(shape=(candidate_count, 2))
         current_candidate = 0
-        with open("assignment2/Assignment2_EL/data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
+        with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
             ent2embed = pickle.load(ent_embed_file)
-            with open("assignment2/Assignment2_EL/data/embeddings/word2embed.pk", "rb") as word_embed_file:
+            with open("../data/embeddings/word2embed.pk", "rb") as word_embed_file:
                 word2embed = pickle.load(word_embed_file)
                 for mention in dataset.mentions:
                     ground_truth_id = mention.gt.id
                     for candidate in mention.candidates:
                         is_gt = ground_truth_id == candidate.id
-                        target_matrix[current_candidate] = is_gt
+                        target_row = np.zeros(shape=(1,2))
+                        if is_gt:
+                            target_row[0][1] = 1
+                        else:
+                            target_row[0][0] = 1
+                        target_matrix[current_candidate] = target_row
                         candidate_name = candidate.name.replace(' ', '_')
                         cand_embed = np.array(ent2embed[candidate_name])
                         context_embed_sum = np.zeros(shape=300)
@@ -285,6 +293,5 @@ class NeuralModel():
                         feature_matrix[current_candidate] = row
                         current_candidate = current_candidate + 1
 
-        feature_tensor = torch.as_tensor(feature_matrix, device=self.model.device)
-        target_tensor = torch.as_tensor(target_matrix, device=self.model.device)
-        return feature_tensor, target_tensor
+        candidate_ds = CandidateDataset(feature_matrix, target_matrix)
+        return candidate_ds
