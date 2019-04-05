@@ -8,6 +8,10 @@ from sklearn.model_selection import train_test_split
 import pickle
 import numpy as np
 from numpy.linalg import norm
+import torch.nn as nn
+import torch
+from torch.autograd import Variable
+from torch.utils.data import Dataset, DataLoader
 
 
 class RandomModel:
@@ -173,3 +177,114 @@ class EmbedModel:
                         current_candidate = current_candidate + 1
                                             
         return feature_matrix, target_matrix
+
+class GRU(nn.Module):
+    INPUT_SIZE = 600
+    HIDDEN_SIZE = 100
+    OUTPUT_SIZE = 2
+
+    def __init__(self):
+        super(GRU, self).__init__()
+        #self.hidden_size = 10
+        self.gru = nn.GRU(self.INPUT_SIZE, self.HIDDEN_SIZE)
+        self.linear = nn.Linear(self.HIDDEN_SIZE, self.OUTPUT_SIZE)
+        #self.sm = nn.Softmax(self.OUTPUT_SIZE)
+        # make rows sum to 1, dim=1 would make columns sum to 1
+        self.sm = nn.Softmax(dim=0)
+        if torch.cuda.is_available():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
+
+    def forward(self, input, hidden):
+        _, hn = self.gru(input, hidden)
+        rearranged = hn.view(hn.size()[1], hn.size(2))
+        out1 = self.linear(rearranged)
+        out2 = self.sm(out1)
+        return out2
+
+    def initHidden(self, N):
+        return Variable(torch.randn(1, N, self.HIDDEN_SIZE))
+
+class CandidateDataset(Dataset):
+    def __init__(self, x, y):
+        self.len = x.shape[0]
+        self.x_data = torch.from_mumpy(x)
+        self.y_data = torch.from_mumpy(y)
+    
+    def __getitem__(self, index):
+        return self.x_data[index], self.y_data[index]
+
+    def __len__(self):
+        return self.len
+
+
+class NeuralModel():
+
+    N_EPOCHS = 40
+    BATCH_SIZE = 50
+    
+    def __init__(self, model):
+        self.model = model
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=.01, momentum=.9)
+        self.loss_f = nn.CrossEntropyLoss()
+
+    def fit(self, dataset, candidate_count):
+        feature_tensor, target_tensor = self.get_training_tensors_test(candidate_count)
+        x_train = Variable(feature_tensor)
+        y_train = Variable(target_tensor)
+        for epoch in range(self.N_EPOCHS):
+            print('starting epoch ' + str(epoch))
+            permutation = torch.randperm(x_train.size()[0])
+            for i in range(0, x_train.size()[0], self.BATCH_SIZE):
+                print('starting batch ' + str(i) + ' epoch ' + str(epoch))
+                self.optimizer.zero_grad()
+                indices = permutation[i:i+self.BATCH_SIZE]
+                batch_x, batch_y = x_train[indices], y_train[indices]
+                batch_x = batch_x.view(1, self.BATCH_SIZE, 600)
+                y_pred = self.model(batch_x, self.model.initHidden(batch_x.size()[1]))
+                loss = self.loss_f(y_pred, torch.max(batch_y, 1)[1])
+                loss.backward()
+                self.optimizer.step()
+                print('done batch ' + str(i) + ' epoch ' + str(epoch))
+            print('done epoch ' + str(epoch))
+
+    def predict(self, dataset):
+        pass
+
+    def get_training_tensors_test(self, candidate_count):
+        feature_matrix = np.random.rand(candidate_count, 600)
+        target_matrix = np.random.rand(candidate_count, 2)
+        feature_tensor = torch.as_tensor(feature_matrix, device=self.model.device, dtype=torch.float)
+        target_tensor = torch.as_tensor(target_matrix, device=self.model.device, dtype=torch.long)
+        return feature_tensor, target_tensor
+
+    def get_training_tensors(self, dataset, candidate_count):
+        feature_matrix = np.empty(shape=(candidate_count, 600))
+        target_matrix = np.empty(shape=(candidate_count, 1))
+        current_candidate = 0
+        with open("assignment2/Assignment2_EL/data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
+            ent2embed = pickle.load(ent_embed_file)
+            with open("assignment2/Assignment2_EL/data/embeddings/word2embed.pk", "rb") as word_embed_file:
+                word2embed = pickle.load(word_embed_file)
+                for mention in dataset.mentions:
+                    ground_truth_id = mention.gt.id
+                    for candidate in mention.candidates:
+                        is_gt = ground_truth_id == candidate.id
+                        target_matrix[current_candidate] = is_gt
+                        candidate_name = candidate.name.replace(' ', '_')
+                        cand_embed = np.array(ent2embed[candidate_name])
+                        context_embed_sum = np.zeros(shape=300)
+                        total_context = mention.contexts[0] + mention.contexts[1]
+                        for word in total_context:
+                            if word not in word2embed:
+                                continue
+                            word_embed = np.array(word2embed[word])
+                            context_embed_sum = context_embed_sum + word_embed
+                        row = np.concatenate([cand_embed, context_embed_sum])
+                        feature_matrix[current_candidate] = row
+                        current_candidate = current_candidate + 1
+
+        feature_tensor = torch.as_tensor(feature_matrix, device=self.model.device)
+        target_tensor = torch.as_tensor(target_matrix, device=self.model.device)
+        return feature_tensor, target_tensor
