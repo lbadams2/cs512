@@ -189,8 +189,8 @@ class GRU(nn.Module):
         self.gru = nn.GRU(self.INPUT_SIZE, self.HIDDEN_SIZE)
         self.linear = nn.Linear(self.HIDDEN_SIZE, self.OUTPUT_SIZE)
         #self.sm = nn.Softmax(self.OUTPUT_SIZE)
-        # make rows sum to 1, dim=1 would make columns sum to 1
-        self.sm = nn.Softmax(dim=0)
+        # make rows sum to 1, dim=0 would make columns sum to 1
+        self.sm = nn.Softmax(dim=1)
         if torch.cuda.is_available():
             self.device = 'cuda'
         else:
@@ -198,6 +198,7 @@ class GRU(nn.Module):
 
     def forward(self, input, hidden):
         _, hn = self.gru(input, hidden)
+        # reduce from 3 to 2 dimensions
         rearranged = hn.view(hn.size()[1], hn.size(2))
         out1 = self.linear(rearranged)
         out2 = self.sm(out1)
@@ -215,7 +216,7 @@ class CandidateDataset(Dataset):
         else:
             device = 'cpu'
         self.x_data = torch.as_tensor(x, device=device, dtype=torch.float)
-        self.y_data = torch.as_tensor(y, device=device)
+        self.y_data = torch.as_tensor(y, device=device, dtype=torch.long)
     
     def __getitem__(self, index):
         return self.x_data[index], self.y_data[index]
@@ -245,8 +246,12 @@ class NeuralModel():
                 inputs, labels = Variable(inputs), Variable(labels)
                 self.optimizer.zero_grad()
                 inputs = inputs.view(1, inputs.size()[0], 600)
+                # init hidden with number of rows in input
                 y_pred = self.model(inputs, self.model.initHidden(inputs.size()[1]))
-                loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
+                #loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
+                labels.squeeze_()
+                # labels should be tensor with batch_size rows. Column the index of the class (0 or 1)
+                loss = self.loss_f(y_pred, labels)
                 loss.backward()
                 self.optimizer.step()
                 print('done batch ' + str(batch_idx) + ' epoch ' + str(epoch))
@@ -257,14 +262,14 @@ class NeuralModel():
 
     def get_test_ds(self, candidate_count):
         feature_matrix = np.random.rand(candidate_count, 600)
-        target_matrix = np.random.rand(candidate_count, 2)
+        target_matrix = np.random.rand(candidate_count, 1)
         candidate_ds = CandidateDataset(feature_matrix, target_matrix)
         return candidate_ds
 
     # assignment2/Assignment2_EL
     def get_cand_ds(self, dataset, candidate_count):
         feature_matrix = np.empty(shape=(candidate_count, 600))
-        target_matrix = np.empty(shape=(candidate_count, 2))
+        target_matrix = np.empty(shape=(candidate_count, 1))
         current_candidate = 0
         with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
             ent2embed = pickle.load(ent_embed_file)
@@ -274,12 +279,15 @@ class NeuralModel():
                     ground_truth_id = mention.gt.id
                     for candidate in mention.candidates:
                         is_gt = ground_truth_id == candidate.id
+                        '''
                         target_row = np.zeros(shape=(1,2))
                         if is_gt:
                             target_row[0][1] = 1
                         else:
                             target_row[0][0] = 1
                         target_matrix[current_candidate] = target_row
+                        '''
+                        target_matrix[current_candidate] = is_gt
                         candidate_name = candidate.name.replace(' ', '_')
                         cand_embed = np.array(ent2embed[candidate_name])
                         context_embed_sum = np.zeros(shape=300)
