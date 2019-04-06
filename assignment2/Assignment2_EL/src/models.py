@@ -201,8 +201,8 @@ class GRU(nn.Module):
         # reduce from 3 to 2 dimensions
         rearranged = hn.view(hn.size()[1], hn.size(2))
         out1 = self.linear(rearranged)
-        out2 = self.sm(out1)
-        return out2
+        #out2 = self.sm(out1)
+        return out1
 
     def initHidden(self, N):
         return Variable(torch.randn(1, N, self.HIDDEN_SIZE))
@@ -240,12 +240,13 @@ class NeuralModel():
         candidate_ds = self.get_cand_ds(dataset, candidate_count)
         train_loader = DataLoader(dataset = candidate_ds, batch_size = self.BATCH_SIZE, shuffle = True)
         for epoch in range(self.N_EPOCHS):
-            print('starting epoch ' + str(epoch))
+            #print('starting epoch ' + str(epoch))
+            running_loss = 0.0
             for batch_idx, (inputs, labels) in enumerate(train_loader):
-                print('starting batch ' + str(batch_idx) + ' epoch ' + str(epoch))
+                #print('starting batch ' + str(batch_idx) + ' epoch ' + str(epoch))
                 inputs, labels = Variable(inputs), Variable(labels)
                 self.optimizer.zero_grad()
-                inputs = inputs.view(1, inputs.size()[0], 600)
+                inputs = inputs.view(-1, inputs.size()[0], 600)
                 # init hidden with number of rows in input
                 y_pred = self.model(inputs, self.model.initHidden(inputs.size()[1]))
                 #loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
@@ -254,15 +255,91 @@ class NeuralModel():
                 loss = self.loss_f(y_pred, labels)
                 loss.backward()
                 self.optimizer.step()
-                print('done batch ' + str(batch_idx) + ' epoch ' + str(epoch))
-            print('done epoch ' + str(epoch))
+
+                running_loss += loss.item()
+                if batch_idx % 500 == 499:
+                    print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / 500))
+                    running_loss = 0.0
+                #print('done batch ' + str(batch_idx) + ' epoch ' + str(epoch))
+            #print('done epoch ' + str(epoch))
 
     def predict(self, dataset):
-        pass
+        pred_cids = []
+        with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
+            ent2embed = pickle.load(ent_embed_file)
+            with open("../data/embeddings/word2embed.pk", "rb") as word_embed_file:
+                word2embed = pickle.load(word_embed_file)
+                for mention in dataset.mentions:
+                    if mention.candidates:
+                        current_candidate = 0
+                        candidate_count = len(mention.candidates)
+                        feature_matrix = np.empty(shape=(candidate_count, 600))
+                        #print('Getting matrix for  ' + mention.surface)
+                        for candidate in mention.candidates:                            
+                            candidate_name = candidate.name.replace(' ', '_')
+                            cand_embed = np.array(ent2embed[candidate_name])
+                            context_embed_sum = np.zeros(shape=300)
+                            total_context = mention.contexts[0] + mention.contexts[1]
+                            for word in total_context:
+                                if word not in word2embed:
+                                    continue
+                                word_embed = np.array(word2embed[word])
+                                context_embed_sum = context_embed_sum + word_embed
+                            row = np.concatenate([cand_embed, context_embed_sum])
+                            feature_matrix[current_candidate] = row
+                            current_candidate = current_candidate + 1
+                        
+                        x_data = torch.as_tensor(feature_matrix, device='cpu', dtype=torch.float)
+                        x_data = x_data.view(1, x_data.size()[0], 600)
+                        y_pred = self.model(x_data, self.model.initHidden(x_data.size()[1]))
+                        # this gets max class and its energy for each candidate
+                        max_cand_class = torch.max(y_pred, 1)
+                        max_energy = 0
+                        max_index = -1
+                        for idx, class_label in enumerate(max_cand_class[1]):
+                            class_label = class_label.item()
+                            max_e = max_cand_class[0][idx].item()
+                            if class_label == 1 and max_e > max_energy:
+                                max_index = idx
+                                max_energy = max_e
+                        # this gets the index for the single candidate with max energy 
+                        values, indices = torch.max(max_cand_class[0], 0)
+                        # this gets the class (0 or 1) for the candidate with max energy
+                        max_energy_class = max_cand_class[1][max_index]
+                        print('max index: ' + str(max_index) + ' max class ' + str(max_energy_class))
+                        pred_cids.append(mention.candidates[max_index].id)
+                    else:
+                        pred_cids.append('NIL')
+
+        return pred_cids
+
+    def test_predict(self):
+        feature_matrix = np.random.rand(10, 600)
+        x_data = torch.as_tensor(feature_matrix, device='cpu', dtype=torch.float)
+        x_data = x_data.view(1, x_data.size()[0], 600)
+        y_pred = self.model(x_data, self.model.initHidden(x_data.size()[1]))
+        # this gets max class and its energy for each candidate
+        max_cand_class = torch.max(y_pred, 1)
+        max_energy = 0
+        max_index = -1
+        for idx, class_label in enumerate(max_cand_class[1]):
+            class_label = class_label.item()
+            max_e = max_cand_class[0][idx].item()
+            if class_label == 1 and max_e > max_energy:
+                max_index = idx
+                max_energy = max_e
+        # this gets the index for the single candidate with max energy 
+        values, indices = torch.max(max_cand_class[0], 0)
+        # this gets the class (0 or 1) for the candidate with max energy
+        max_energy_class = max_cand_class[1][max_index]
+        print('')
 
     def get_test_ds(self, candidate_count):
         feature_matrix = np.random.rand(candidate_count, 600)
-        target_matrix = np.random.rand(candidate_count, 1)
+        target_matrix = np.zeros((candidate_count, 1), dtype=int)
+        for i in range(candidate_count):
+            if i % 5 == 0:
+                target_matrix[i] = 1
         candidate_ds = CandidateDataset(feature_matrix, target_matrix)
         return candidate_ds
 

@@ -12,6 +12,14 @@ class Candidate:
         self.name = name
         next(self._count)
 
+    @classmethod
+    def init_count(cls):
+        cls._count = count(0)
+
+    @classmethod
+    def get_count(cls):
+        return cls._count.__next__()
+
 
 class Mention:
     def __init__(self, m_dict):
@@ -34,6 +42,7 @@ class Dataset:
     }
 
     def __init__(self, filepath):
+        #Candidate.init_count()
         self.mentions = [Mention(d) for d in Json.loadf(filepath)]
 
     @classmethod

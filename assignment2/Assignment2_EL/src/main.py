@@ -5,7 +5,7 @@ import pickle
 def run_original_model():
     model = models.EmbedModel()
     trainset = Dataset.get('train')
-    num_train_candidates = Candidate._count.__next__()
+    num_train_candidates = Candidate.get_count()
     model.fit(trainset, num_train_candidates)
     print('Training finished!')
 
@@ -19,10 +19,17 @@ def run_neural_model():
     gru = models.GRU()
     model = models.NeuralModel(gru)
     trainset = Dataset.get('train')
-    num_train_candidates = Candidate._count.__next__()
+    num_train_candidates = Candidate.get_count()
     model.fit(trainset, num_train_candidates)
     print('Training finished!')
-
+    #model.test_predict()
+    
+    for dsname in Dataset.ds2path.keys():
+        ds = Dataset.get(dsname)
+        pred_cids = model.predict(ds)
+        print(dsname, ds.eval(pred_cids))
+    
+    
 
 if __name__ == '__main__':
     run_neural_model()
