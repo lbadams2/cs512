@@ -181,7 +181,7 @@ class EmbedModel:
 class GRU(nn.Module):
     INPUT_SIZE = 600
     HIDDEN_SIZE = 100
-    OUTPUT_SIZE = 2
+    OUTPUT_SIZE = 1
 
     def __init__(self):
         super(GRU, self).__init__()
@@ -190,7 +190,8 @@ class GRU(nn.Module):
         self.linear = nn.Linear(self.HIDDEN_SIZE, self.OUTPUT_SIZE)
         #self.sm = nn.Softmax(self.OUTPUT_SIZE)
         # make rows sum to 1, dim=0 would make columns sum to 1
-        self.sm = nn.Softmax(dim=1)
+        #self.sm = nn.Softmax(dim=1)
+        self.sm = nn.Sigmoid()
         if torch.cuda.is_available():
             self.device = 'cuda'
         else:
@@ -201,8 +202,8 @@ class GRU(nn.Module):
         # reduce from 3 to 2 dimensions
         rearranged = hn.view(hn.size()[1], hn.size(2))
         out1 = self.linear(rearranged)
-        #out2 = self.sm(out1)
-        return out1
+        out2 = self.sm(out1)
+        return out2
 
     def initHidden(self, N):
         return Variable(torch.randn(1, N, self.HIDDEN_SIZE))
@@ -216,7 +217,7 @@ class CandidateDataset(Dataset):
         else:
             device = 'cpu'
         self.x_data = torch.as_tensor(x, device=device, dtype=torch.float)
-        self.y_data = torch.as_tensor(y, device=device, dtype=torch.long)
+        self.y_data = torch.as_tensor(y, device=device, dtype=torch.float)
     
     def __getitem__(self, index):
         return self.x_data[index], self.y_data[index]
@@ -232,13 +233,14 @@ class NeuralModel():
     
     def __init__(self, model):
         self.model = model
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=.01, momentum=.9)
-        self.loss_f = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+        self.loss_f = nn.BCELoss()
 
     def fit(self, dataset, candidate_count):
         #candidate_ds = self.get_test_ds(candidate_count)
         candidate_ds = self.get_cand_ds(dataset, candidate_count)
         train_loader = DataLoader(dataset = candidate_ds, batch_size = self.BATCH_SIZE, shuffle = True)
+        self.model.train()
         for epoch in range(self.N_EPOCHS):
             #print('starting epoch ' + str(epoch))
             running_loss = 0.0
@@ -250,7 +252,7 @@ class NeuralModel():
                 # init hidden with number of rows in input
                 y_pred = self.model(inputs, self.model.initHidden(inputs.size()[1]))
                 #loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
-                labels.squeeze_()
+                #labels.squeeze_()
                 # labels should be tensor with batch_size rows. Column the index of the class (0 or 1)
                 loss = self.loss_f(y_pred, labels)
                 loss.backward()
@@ -265,6 +267,7 @@ class NeuralModel():
 
     def predict(self, dataset):
         pred_cids = []
+        self.model.eval()
         with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
             ent2embed = pickle.load(ent_embed_file)
             with open("../data/embeddings/word2embed.pk", "rb") as word_embed_file:
@@ -290,7 +293,7 @@ class NeuralModel():
                             current_candidate = current_candidate + 1
                         
                         x_data = torch.as_tensor(feature_matrix, device='cpu', dtype=torch.float)
-                        x_data = x_data.view(1, x_data.size()[0], 600)
+                        x_data = x_data.view(-1, x_data.size()[0], 600)                        
                         y_pred = self.model(x_data, self.model.initHidden(x_data.size()[1]))
                         # this gets max class and its energy for each candidate
                         max_cand_class = torch.max(y_pred, 1)
@@ -299,14 +302,14 @@ class NeuralModel():
                         for idx, class_label in enumerate(max_cand_class[1]):
                             class_label = class_label.item()
                             max_e = max_cand_class[0][idx].item()
-                            if class_label == 1 and max_e > max_energy:
+                            if max_e > max_energy:
                                 max_index = idx
                                 max_energy = max_e
                         # this gets the index for the single candidate with max energy 
                         values, indices = torch.max(max_cand_class[0], 0)
                         # this gets the class (0 or 1) for the candidate with max energy
                         max_energy_class = max_cand_class[1][max_index]
-                        print('max index: ' + str(max_index) + ' max class ' + str(max_energy_class))
+                        #print('max index: ' + str(max_index) + ' max class ' + str(max_energy_class))
                         pred_cids.append(mention.candidates[max_index].id)
                     else:
                         pred_cids.append('NIL')
