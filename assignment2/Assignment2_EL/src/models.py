@@ -179,7 +179,7 @@ class EmbedModel:
         return feature_matrix, target_matrix
 
 class GRU(nn.Module):
-    INPUT_SIZE = 600
+    INPUT_SIZE = 603
     HIDDEN_SIZE = 100
     OUTPUT_SIZE = 1
 
@@ -230,6 +230,7 @@ class NeuralModel():
 
     N_EPOCHS = 20
     BATCH_SIZE = 50
+    INPUT_SIZE = 603
     
     def __init__(self, model):
         self.model = model
@@ -252,7 +253,7 @@ class NeuralModel():
                 #print('starting batch ' + str(batch_idx) + ' epoch ' + str(epoch))
                 inputs, labels = Variable(inputs), Variable(labels)
                 self.optimizer.zero_grad()
-                inputs = inputs.view(-1, inputs.size()[0], 600)
+                inputs = inputs.view(-1, inputs.size()[0], self.INPUT_SIZE)
                 # init hidden with number of rows in input
                 y_pred = self.model(inputs, self.model.initHidden(inputs.size()[1]))
                 #loss = self.loss_f(y_pred, torch.max(labels, 1)[1])
@@ -278,11 +279,14 @@ class NeuralModel():
                 word2embed = pickle.load(word_embed_file)
                 for mention in dataset.mentions:
                     if mention.candidates:
+                        surface_name = mention.surface
                         current_candidate = 0
                         candidate_count = len(mention.candidates)
-                        feature_matrix = np.empty(shape=(candidate_count, 600))
+                        feature_matrix = np.empty(shape=(candidate_count, self.INPUT_SIZE))
                         #print('Getting matrix for  ' + mention.surface)
-                        for candidate in mention.candidates:                            
+                        for candidate in mention.candidates:
+                            sim = SequenceMatcher(None, candidate.name, surface_name).ratio()
+                            prob = candidate.prob                       
                             candidate_name = candidate.name.replace(' ', '_')
                             cand_embed = np.array(ent2embed[candidate_name])
                             context_embed_sum = np.zeros(shape=300)
@@ -292,12 +296,14 @@ class NeuralModel():
                                     continue
                                 word_embed = np.array(word2embed[word])
                                 context_embed_sum = context_embed_sum + word_embed
-                            row = np.concatenate([cand_embed, context_embed_sum])
+                            cos_sim = np.dot(cand_embed, context_embed_sum)/norm(cand_embed)*norm(context_embed_sum)
+                            hc_feature_array = np.array([sim, prob, cos_sim])
+                            row = np.concatenate([cand_embed, context_embed_sum, hc_feature_array])
                             feature_matrix[current_candidate] = row
                             current_candidate = current_candidate + 1
                         
                         x_data = torch.as_tensor(feature_matrix, device='cpu', dtype=torch.float)
-                        x_data = x_data.view(-1, x_data.size()[0], 600)                        
+                        x_data = x_data.view(-1, x_data.size()[0], self.INPUT_SIZE)                        
                         y_pred = self.model(x_data, self.model.initHidden(x_data.size()[1]))
                         # this gets max class and its energy for each candidate
                         max_cand_class = torch.max(y_pred, 1)
@@ -321,9 +327,9 @@ class NeuralModel():
         return pred_cids
 
     def test_predict(self):
-        feature_matrix = np.random.rand(10, 600)
+        feature_matrix = np.random.rand(10, self.INPUT_SIZE)
         x_data = torch.as_tensor(feature_matrix, device='cpu', dtype=torch.float)
-        x_data = x_data.view(1, x_data.size()[0], 600)
+        x_data = x_data.view(1, x_data.size()[0], self.INPUT_SIZE)
         y_pred = self.model(x_data, self.model.initHidden(x_data.size()[1]))
         # this gets max class and its energy for each candidate
         max_cand_class = torch.max(y_pred, 1)
@@ -342,7 +348,7 @@ class NeuralModel():
         print('')
 
     def get_test_ds(self, candidate_count):
-        feature_matrix = np.random.rand(candidate_count, 600)
+        feature_matrix = np.random.rand(candidate_count, self.INPUT_SIZE)
         target_matrix = np.zeros((candidate_count, 1), dtype=int)
         for i in range(candidate_count):
             if i % 5 == 0:
@@ -352,7 +358,7 @@ class NeuralModel():
 
     # assignment2/Assignment2_EL
     def get_cand_ds(self, dataset, candidate_count):
-        feature_matrix = np.empty(shape=(candidate_count, 600))
+        feature_matrix = np.empty(shape=(candidate_count, self.INPUT_SIZE))
         target_matrix = np.empty(shape=(candidate_count, 1))
         current_candidate = 0
         with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
@@ -361,7 +367,10 @@ class NeuralModel():
                 word2embed = pickle.load(word_embed_file)
                 for mention in dataset.mentions:
                     ground_truth_id = mention.gt.id
+                    surface_name = mention.surface
                     for candidate in mention.candidates:
+                        sim = SequenceMatcher(None, candidate.name, surface_name).ratio()
+                        prob = candidate.prob
                         is_gt = ground_truth_id == candidate.id
                         '''
                         target_row = np.zeros(shape=(1,2))
@@ -381,7 +390,9 @@ class NeuralModel():
                                 continue
                             word_embed = np.array(word2embed[word])
                             context_embed_sum = context_embed_sum + word_embed
-                        row = np.concatenate([cand_embed, context_embed_sum])
+                        cos_sim = np.dot(cand_embed, context_embed_sum)/norm(cand_embed)*norm(context_embed_sum)
+                        hc_feature_array = np.array([sim, prob, cos_sim])
+                        row = np.concatenate([cand_embed, context_embed_sum, hc_feature_array])
                         feature_matrix[current_candidate] = row
                         current_candidate = current_candidate + 1
 
