@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 import pickle
 import numpy as np
 from numpy.linalg import norm
@@ -18,7 +19,7 @@ class RandomModel:
     def __init__(self):
         pass
 
-    def fit(self, dataset):
+    def fit(self, dataset, candidate_count):
         # fill this function if your model requires training
         pass
 
@@ -32,7 +33,7 @@ class PriorModel:
     def __init__(self):
         pass
 
-    def fit(self, dataset):
+    def fit(self, dataset, candidate_count):
         # fill this function if your model requires training
         pass
 
@@ -103,7 +104,13 @@ class EmbedModel:
 
     def fit(self, dataset, candidate_count):
         feature_matrix, target_matrix = self.get_training_dataframe(dataset, candidate_count)
-        self.logreg.fit(feature_matrix, target_matrix.ravel())
+        target_matrix = target_matrix.ravel()
+        '''
+        res = filter(lambda y: y != 1 or y != 0, target_matrix)
+        res = list(res)
+        print('num vals not 0 or 1 ' + str(len(res)) + '  ' + str(res[0]))
+        '''
+        self.logreg.fit(feature_matrix, target_matrix)
 
     def predict(self, dataset):
         pred_cids = []
@@ -145,10 +152,12 @@ class EmbedModel:
 
         return pred_cids
 
+    # assignment2/Assignment2_EL
     def get_training_dataframe(self, dataset, candidate_count):
-        feature_matrix = np.empty(shape=(candidate_count, 603))
-        target_matrix = np.empty(shape=(candidate_count, 1))
+        feature_matrix = np.zeros(shape=(candidate_count, 603))
+        target_matrix = np.zeros(shape=(candidate_count, 1), dtype=int)
         current_candidate = 0
+        #do_print = True
         with open("../data/embeddings/ent2embed.pk", "rb") as ent_embed_file:
             ent2embed = pickle.load(ent_embed_file)
             with open("../data/embeddings/word2embed.pk", "rb") as word_embed_file:
@@ -160,7 +169,7 @@ class EmbedModel:
                         sim = SequenceMatcher(None, candidate.name, surface_name).ratio()
                         prob = candidate.prob
                         is_gt = ground_truth_id == candidate.id
-                        target_matrix[current_candidate] = is_gt
+                        target_matrix[current_candidate] = int(is_gt)
                         candidate_name = candidate.name.replace(' ', '_')
                         cand_embed = np.array(ent2embed[candidate_name])
                         context_embed_sum = np.zeros(shape=300)
@@ -173,8 +182,17 @@ class EmbedModel:
                         cos_sim = np.dot(cand_embed, context_embed_sum)/norm(cand_embed)*norm(context_embed_sum)
                         hc_feature_array = np.array([sim, prob, cos_sim])
                         row = np.concatenate([cand_embed, context_embed_sum, hc_feature_array])
+                        '''
+                        X = np.asanyarray(row)
+                        if (X.dtype.char in np.typecodes['AllFloat'] and not np.isfinite(X.sum()) and not np.isfinite(X).all()):
+                            print('row ' + str(current_candidate) + ' has invalid')
+                            print(row)
+                            do_print = False
+                        '''
                         feature_matrix[current_candidate] = row
                         current_candidate = current_candidate + 1
+
+            #print('total candidates ' + str(current_candidate))
                                             
         return feature_matrix, target_matrix
 
@@ -228,8 +246,8 @@ class CandidateDataset(Dataset):
 
 class NeuralModel():
 
-    N_EPOCHS = 20
-    BATCH_SIZE = 50
+    N_EPOCHS = 50
+    BATCH_SIZE = 32
     INPUT_SIZE = 603
     
     def __init__(self, model):
