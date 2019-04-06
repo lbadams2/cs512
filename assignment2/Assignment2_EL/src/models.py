@@ -228,13 +228,17 @@ class CandidateDataset(Dataset):
 
 class NeuralModel():
 
-    N_EPOCHS = 5
+    N_EPOCHS = 20
     BATCH_SIZE = 50
     
     def __init__(self, model):
         self.model = model
         self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         self.loss_f = nn.BCELoss()
+        if torch.cuda.is_available():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
 
     def fit(self, dataset, candidate_count):
         #candidate_ds = self.get_test_ds(candidate_count)
