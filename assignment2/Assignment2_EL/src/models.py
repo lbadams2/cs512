@@ -260,15 +260,13 @@ class NeuralModel():
             self.device = 'cpu'
 
     def fit(self, dataset, candidate_count):
-        #candidate_ds = self.get_test_ds(candidate_count)
-        candidate_ds = self.get_cand_ds(dataset, candidate_count)
+        candidate_ds = self.get_test_ds(candidate_count)
+        #candidate_ds = self.get_cand_ds(dataset, candidate_count)
         train_loader = DataLoader(dataset = candidate_ds, batch_size = self.BATCH_SIZE, shuffle = True)
         self.model.train()
         for epoch in range(self.N_EPOCHS):
-            #print('starting epoch ' + str(epoch))
             running_loss = 0.0
             for batch_idx, (inputs, labels) in enumerate(train_loader):
-                #print('starting batch ' + str(batch_idx) + ' epoch ' + str(epoch))
                 inputs, labels = Variable(inputs), Variable(labels)
                 self.optimizer.zero_grad()
                 inputs = inputs.view(-1, inputs.size()[0], self.INPUT_SIZE)
@@ -285,8 +283,7 @@ class NeuralModel():
                 if batch_idx % 500 == 499:
                     print('[%d, %5d] loss: %.3f' % (epoch + 1, batch_idx + 1, running_loss / 500))
                     running_loss = 0.0
-                #print('done batch ' + str(batch_idx) + ' epoch ' + str(epoch))
-            #print('done epoch ' + str(epoch))
+        torch.save(self.model.state_dict(), 'assign2.model')
 
     def predict(self, dataset):
         pred_cids = []

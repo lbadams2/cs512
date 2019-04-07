@@ -54,8 +54,12 @@ class Dataset:
         gold_cids = [m.gt.id for m in self.mentions]
         
         true_pos = 0
+        #count = 0
         for g, p in zip(gold_cids, pred_cids):
             true_pos += int(g == p and p != 'NIL')
+            #if g != p:
+            #    print('Wrong prediction ' + str(p) + ' count: ' + str(count))
+            #count = count + 1
 
         precision = true_pos / len([p for p in pred_cids if p != 'NIL'])
         recall = true_pos / len(gold_cids)
