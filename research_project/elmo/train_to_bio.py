@@ -1,7 +1,9 @@
 import json
+import nltk
 
+#awk '$3 == "I" {print $1, $2, $3}' bio.txt
 skip_chars = ['!', '.', ',', '?', ':', '[', ']', '(', ')', ';', '"', '\\', '“', '”', '‘', '’']
-with open('/Users/liamadams/Documents/school/cs512/research_project/toy.json', 'r') as json_file:
+with open('/Users/liamadams/Documents/school/cs512/research_project/toy2.json', 'r') as json_file:
     with open('/Users/liamadams/Documents/school/cs512/research_project/elmo/bio.txt', 'w+') as out_file:
         data = json.load(json_file)        
         for node in data:
@@ -9,6 +11,7 @@ with open('/Users/liamadams/Documents/school/cs512/research_project/toy.json', '
             last_char_space = False
             multi_word_entity = False
             word = ''
+            pos = ''
             prev_tag = ''
             tweet = node[0]
             tags = node[1]
@@ -27,19 +30,26 @@ with open('/Users/liamadams/Documents/school/cs512/research_project/toy.json', '
                     word += c
                     last_char_space = False
                 else:
+                    if word:
+                        pos = nltk.pos_tag(word)[0][1]
                     if multi_word_entity:
-                        tag = 'I' + prev_tag[1:]
-                        line = word + ' ' + tag
+                        # for apostrohpes
+                        if prev_tag[1:]:
+                            tag = 'I' + prev_tag[1:]
+                        else:
+                            tag = 'I' + tag[1:]
+                        line = word + ' ' + pos + ' ' + tag
                         multi_word_entity = False
                     else:
                         if prev_tag == 'O':
-                            line = word + ' ' + prev_tag
+                            line = word + ' ' + pos + ' ' + prev_tag
                         else:
                             tag = 'B' + prev_tag[1:]
-                            line = word + ' ' + tag
-                    if not word.isspace():
+                            line = word + ' ' + pos + ' ' + tag
+                    if not word.isspace() and word:
                         out_file.write(line + '\n')
                     word = ''
+                    pos = ''
                     last_char_space = True
                 prev_tag = current_tag
             out_file.write('\n')
