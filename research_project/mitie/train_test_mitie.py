@@ -32,10 +32,12 @@ def read_file(isTest, filename):
                             print('Error ' + tokens[0] + ' ' + tokens[1] + ' ' + tokens[2])
                             exit()
                     train_samples.append(sample)
+                    sentence.clear()
+                    tag_ranges.clear()
                 else:
                     test_samples.append((sentence, tag_ranges))
-                sentence.clear()
-                tag_ranges.clear()
+                    sentence = []
+                    tag_ranges = []
                 start_tag = 0
                 end_tag = 1
                 word_counter = 0
@@ -66,31 +68,47 @@ def read_file(isTest, filename):
     else:
         return train_samples
 
-train_samples = read_file(False, 'train.txt')
+'''
+train_samples = read_file(False, 'examples/python/train.txt')
 trainer = ner_trainer("../../MITIE-models/english/total_word_feature_extractor.dat")
 for sample in train_samples:
     trainer.add(sample)
 trainer.num_threads = 4
 ner = trainer.train()
 ner.save_to_disk("twitter_ner_model.dat")
+'''
 
-
-ner = named_entity_extractor('twitter_ner_model.dat')
+# examples/python/
 test_samples = read_file(True, 'test.txt')
+ner = named_entity_extractor('twitter_ner_model.dat')
+true_pos = 0
+num_predictions = 0
+true_total = 0
+
 for ts in test_samples:
     sentence = ts[0]
     tag_ranges = ts[1]
     ground_truth_entities = []
     for tr in tag_ranges:
+        true_total += 1
         tag_range = tr[0]
-        entity = " ".join(sentence[i] for i in tag_range)
-        ground_truth_entities.append((entity, tr[1]))
+        #entity = " ".join(sentence[i] for i in tag_range)
+        ground_truth_entities.append((tag_range, tr[1]))
     
-    prediction = ner.extract_entities(sentence)
-    pred_entities = []
+    pred_entities = ner.extract_entities(sentence)
+    #pred_entities = []
     for e in pred_entities:
+        num_predictions += 1
         tag_range = e[0]
         tag = e[1]
-        entity_text = " ".join(sentence[i] for i in tag_range)
-        pred_entities.append((entity_text, tag))
+        if (tag_range, tag) in ground_truth_entities:
+            true_pos += 1
+        #entity_text = " ".join(sentence[i] for i in tag_range)
+        #pred_entities.append((entity_text, tag))
 
+precision = true_pos / num_predictions
+recall = true_pos / true_total
+f1 = 2 * precision * recall / (precision + recall)
+print('precision: ', precision)
+print('recall: ', recall)
+print('f1: ', f1)
