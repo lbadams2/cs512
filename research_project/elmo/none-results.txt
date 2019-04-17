@@ -1,0 +1,152 @@
+-- twitter --
+Wrong BIO-Encoding 19/727 labels when setting incorrect labels to O: 2.61%
+Wrong BIO-Encoding 13/721 labels when setting incorrect labels to B: 1.80%
+Dev-Data: Prec: 0.702, Rec: 0.675, F1: 0.6884
+Wrong BIO-Encoding 19/815 labels when setting incorrect labels to O: 2.33%
+Wrong BIO-Encoding 15/811 labels when setting incorrect labels to B: 1.85%
+Test-Data: Prec: 0.710, Rec: 0.672, F1: 0.6903
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.6893
+  Test-Score: 0.6819
+
+3.20 sec for evaluation
+!!! Early stopping, no improvement after 5 epochs !!!
+
+None - Adam
+per precision:  0.802158273381295
+per recall:  0.9591397849462365
+per f1:  0.8736532810969637
+
+loc precision:  0.6260869565217392
+loc recall:  0.7346938775510204
+loc f1:  0.6760563380281691
+
+org precision:  0.4065040650406504
+org recall:  0.46296296296296297
+org f1:  0.4329004329004329
+
+misc precision:  0.16981132075471697
+misc recall:  0.05806451612903226
+misc f1:  0.08653846153846154
+Test-Data: Prec: 0.687, Rec: 0.684, F1: 0.6853
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.6879
+  Test-Score: 0.6870
+
+
+None - SGD
+per precision:  0.7065868263473054
+per recall:  0.9414893617021277
+per f1:  0.8072976054732042
+
+loc precision:  0.2916666666666667
+loc recall:  0.4827586206896552
+loc f1:  0.3636363636363637
+
+org precision:  0.10344827586206896
+org recall:  0.058823529411764705
+org f1:  0.075
+
+misc precision:  0.3333333333333333
+misc recall:  0.010638297872340425
+misc f1:  0.020618556701030927
+Test-Data: Prec: 0.684, Rec: 0.526, F1: 0.5945
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.5649
+  Test-Score: 0.5945
+
+
+
+None - adagrad
+per precision:  0.7838312829525483
+per recall:  0.9330543933054394
+per f1:  0.8519579751671441
+
+loc precision:  0.5384615384615384
+loc recall:  0.7623762376237624
+loc f1:  0.6311475409836065
+
+org precision:  0.3798449612403101
+org recall:  0.44144144144144143
+org f1:  0.4083333333333334
+
+misc precision:  0.14754098360655737
+misc recall:  0.04712041884816754
+misc f1:  0.07142857142857144
+Test-Data: Prec: 0.652, Rec: 0.687, F1: 0.6690
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.6907
+  Test-Score: 0.6674
+
+
+None - adadelta
+per precision:  0.7902946273830156
+per recall:  0.96
+per f1:  0.8669201520912547
+
+loc precision:  0.5785123966942148
+loc recall:  0.6862745098039216
+loc f1:  0.6278026905829596
+
+org precision:  0.4015748031496063
+org recall:  0.45535714285714285
+org f1:  0.42677824267782427
+
+misc precision:  0.13414634146341464
+misc recall:  0.055
+misc f1:  0.07801418439716312
+Test-Data: Prec: 0.654, Rec: 0.698, F1: 0.6751
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.6795
+  Test-Score: 0.6784
+
+
+None - rmsprop
+per precision:  0.7932862190812721
+per recall:  0.961456102783726
+per f1:  0.8693126815101646
+
+loc precision:  0.6115702479338843
+loc recall:  0.7708333333333334
+loc f1:  0.6820276497695853
+
+org precision:  0.4375
+org recall:  0.38181818181818183
+org f1:  0.4077669902912621
+
+misc precision:  0.18
+misc recall:  0.0625
+misc f1:  0.09278350515463918
+Test-Data: Prec: 0.697, Rec: 0.677, F1: 0.6868
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.6863
+  Test-Score: 0.6931
+
+
+None - nadam
+per precision:  0.8007246376811594
+per recall:  0.9424307036247335
+per f1:  0.8658178256611165
+
+loc precision:  0.5669291338582677
+loc recall:  0.6990291262135923
+loc f1:  0.6260869565217391
+
+org precision:  0.3656716417910448
+org recall:  0.44545454545454544
+org f1:  0.4016393442622951
+
+misc precision:  0.14035087719298245
+misc recall:  0.04819277108433735
+misc f1:  0.07174887892376682
+Test-Data: Prec: 0.668, Rec: 0.678, F1: 0.6730
+
+Scores from epoch with best dev-scores:
+  Dev-Score: 0.7014
+  Test-Score: 0.6961
