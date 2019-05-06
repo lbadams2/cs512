@@ -229,6 +229,8 @@ def evaluate(model, loss_fn, data_iterator, metrics, params, num_steps):
 
 def predict():
     tests = get_tweets_as_idx('../nltk/train.txt')
+    test_data_iterator = data_iterator(tests[0], tests[1], 16)
+    
 
 
 
