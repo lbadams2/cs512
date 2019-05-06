@@ -220,6 +220,25 @@ def accuracy(outputs, labels):
     outputs = np.argmax(outputs, axis=1)
     return np.sum(outputs == labels)/float(np.sum(mask))
 
+total_predicted = 0
+correct_predictions = 0
+def precision(outputs, labels):
+    labels = labels.ravel()
+    # np.argmax gives us the class predicted for each token by the model
+    outputs = np.argmax(outputs, axis=1)
+    matching = False
+    for i, tag in enumerate(outputs):
+        if tag == 'O':
+            if matching and labels[i] == 'O':
+                correct_predictions += 1
+            matching = False
+            continue
+        if tag.startswith('B'):
+            total_predicted += 1
+        if tag == labels[i]:
+            matching = True
+        else:
+            matching = False
 
 def evaluate(model, loss_fn, data_iterator, metrics, params, num_steps):
     try:
@@ -234,6 +253,7 @@ def evaluate(model, loss_fn, data_iterator, metrics, params, num_steps):
         # extract data from torch Variable, move to cpu, convert to numpy arrays
         output_batch = output_batch.data.cpu().numpy()
         labels_batch = labels_batch.data.cpu().numpy()
+        precision(output_batch, labels_batch)
         summary_batch = {metric: metrics[metric](output_batch, labels_batch) for metric in metrics}
         summary_batch['loss'] = loss.item()
         summ.append(summary_batch)
@@ -246,7 +266,12 @@ def evaluate(model, loss_fn, data_iterator, metrics, params, num_steps):
 
 
 def predict(params, loss_fn, metrics, model):
-    #model = torch.load('ner_model')
+    if not model:
+        vocab_size = len(total_word_to_idx)
+        params = {'learning_rate': 1e-3, 'lstm_hidden_dim': 50, 'embedding_dim': 50, \
+            'number_of_tags': 9, 'vocab_size': vocab_size, 'batch_size': 16, 'num_epochs': 10}
+        model = Net(params)
+        model.load_state_dict(torch.load('ner_model'))
     tests = get_tweets_as_idx(TEST_PATH)
     test_size = len(tests[0])
     num_steps = (test_size + 1) // params['batch_size']
@@ -285,16 +310,17 @@ def run(metrics):
     vals = get_tweets_as_idx(DEV_PATH)
     vocab_size = len(total_word_to_idx)
     params = {'learning_rate': 1e-3, 'lstm_hidden_dim': 50, 'embedding_dim': 50, \
-        'number_of_tags': 9, 'vocab_size': vocab_size, 'batch_size': 16, 'num_epochs': 10}
+        'number_of_tags': 9, 'vocab_size': vocab_size, 'batch_size': 16, 'num_epochs': 2}
     model = Net(params)
     optimizer = optim.Adam(model.parameters(), lr=params['learning_rate']) 
     train_and_eval(model, trains, vals, optimizer, loss_function, metrics, params)
     test_metrics = predict(params, loss_function, metrics, model)
     print(test_metrics['accuracy'])
+    print(correct_predictions / total_predicted)
 
 if __name__ == '__main__':
     metrics = {'accuracy': accuracy}
     run(metrics)
     #params = {'batch_size': 16}
     #create_index_dicts()
-    #predict(params, loss_function, metrics)
+    #predict(params, loss_function, metrics, None)
