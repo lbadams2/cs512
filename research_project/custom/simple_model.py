@@ -3,6 +3,8 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 from keras.models import Model, Input, load_model
 from keras.layers import LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional
+from keras_contrib.layers import CRF
+from seqeval.metrics import precision_score, recall_score, f1_score, classification_report
 
 
 TRAIN_PATH = 'research_project/nltk/train.txt'
@@ -70,18 +72,29 @@ def run():
     y_dev = pad_sequences(maxlen=max_len, sequences=y_dev, padding="post", value=tag_map["O"])
     y_dev = [to_categorical(i, num_classes=9) for i in y_dev]
 
+    test_sentences = read_train_file(TEST_PATH)
+    test_max_len = 33
+    X_test = [[word_map[w[0]] for w in s] for s in test_sentences]
+    X_test = pad_sequences(maxlen=test_max_len, sequences=X_test, padding="post", value=n_words - 1)
+    y_test = [[tag_map[w[2]] for w in s] for s in test_sentences]
+    y_test = pad_sequences(maxlen=test_max_len, sequences=y_test, padding="post", value=tag_map["O"])
+
     input = Input(shape=(max_len,))
-    model = Embedding(input_dim=n_words, output_dim=50, input_length=max_len)(input)
+    model = Embedding(input_dim=n_words + 1, output_dim=20, input_length=max_len)(input)
     model = Dropout(0.1)(model)
-    model = Bidirectional(LSTM(units=100, return_sequences=True, recurrent_dropout=0.1))(model)
-    out = TimeDistributed(Dense(n_tags, activation="softmax"))(model)  # softmax output layer
+    model = Bidirectional(LSTM(units=50, return_sequences=True, recurrent_dropout=0.1))(model)
+    model = TimeDistributed(Dense(n_tags, activation="relu"))(model)  # softmax output layer
+    crf = CRF(n_tags)  # CRF layer
+    out = crf(model)  # output
 
     model = Model(input, out)
-    model.compile(optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"])
+    model.compile(optimizer="rmsprop", loss=crf.loss_function, metrics=[crf.accuracy])
     history = model.fit(X, np.array(y), batch_size=32, epochs=5, verbose=1)
     model.save('simple_model.h5')
+    return model, tag_map, X_test, y_test
 
-def predict(model):
+def predict(model, X_test, y_test):
+    '''
     test_sentences = read_train_file(TEST_PATH)
     word_map, tag_map = create_word_idx()
     n_words = len(word_map)
@@ -93,6 +106,7 @@ def predict(model):
     y_test = [[tag_map[w[2]] for w in s] for s in test_sentences]
     y_test = pad_sequences(maxlen=test_max_len, sequences=y_test, padding="post", value=tag_map["O"])
     #y_test = [to_categorical(i, num_classes=n_tags) for i in y_test]
+    '''
 
     total_predicted = 0
     total_correct = 0
@@ -124,9 +138,24 @@ def predict(model):
     f1 = 2 * precision * recall / (precision + recall)
     print('f1:', f1)
 
+def pred2label(pred, idx2tag):
+    out = []
+    for pred_i in pred:
+        out_i = []
+        for p in pred_i:
+            p_i = np.argmax(p)
+            out_i.append(idx2tag[p_i].replace("PAD", "O"))
+        out.append(out_i)
+    return out
 
 if __name__ == '__main__':
-    #run()
-    model = load_model('simple_model.h5')
-    predict(model)
+    model, tag_map, X_test, y_test = run()
+    '''
+    idx2tag = {i: w for w, i in tag_map.items()}
+    test_pred = model.predict(X_test, verbose=1)
+    pred_labels = pred2label(test_pred, idx2tag)
+    test_labels = pred2label(y_test, idx2tag)
+    print(classification_report(test_labels, pred_labels))
+    '''
+    predict(model, X_test, y_test)
 
